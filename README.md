@@ -6,11 +6,6 @@ This repository contains the codebase for the paper *"Emotional Decision-Making 
 
 Emotions significantly influence human decision-making. This project explores how emotional states affect LLMs' alignment in strategic games and ethical scenarios, using a novel framework to assess these impacts across various game-theoretical settings and ethical benchmarks. The research includes experiments with different LLMs, investigating emotional biases that impact ethical and strategic choices.
 
-### Key Features
-- **Emotional Modeling**: Introduces a structured framework to prompt LLMs with predefined emotions and analyze their influence on decision-making.
-- **Game-Theoretical Evaluation**: Examines LLMs' behavior in bargaining, repeated games, and multi-player strategic settings.
-- **Ethics Benchmarking**: Assesses model responses to ethical questions under emotional influence.
-- **Model Comparisons**: Includes experiments on both open-source and proprietary models with multilingual capabilities.
 ## Project Structure
 
 ```
@@ -35,11 +30,11 @@ Emotions significantly influence human decision-making. This project explores ho
 
 ## Key Features
 
-- Novel framework for integrating emotions into LLMs' decision-making in game theory
-- Experimental study across various strategic games
-- Analysis of emotional and strategic biases in LLM decision-making
-- Comparison of proprietary and open-source LLM performance
-- Multi-language support (English & Russian)
+- **Emotional Modeling**: Structured framework to prompt LLMs with predefined emotions and analyze their influence on decision-making
+- **Game-Theoretical Evaluation**: Examines LLMs' behavior in bargaining, repeated games, and multi-player strategic settings
+- **Log Analysis Tools**: Automated analysis scripts for generating statistical reports from experiment logs
+- **Model Comparisons**: Experiments on both open-source and proprietary models via AWS Bedrock
+- **Multi-language Support**: English & Russian prompts and game configurations
 
 ## Games
 
@@ -77,31 +72,42 @@ The framework supports integration of:
 
    If `requirements.txt` doesn't exist, create it with the following content:
    ```
-   openai
+   boto3
    pandas
    tqdm
    pydantic
    python-dotenv
+   botocore
    ```
 
-4. Set up environment variables:
-   - Create a `.env` file in the root directory of the project
-   - Add your OpenAI API key to the `.env` file:
+4. Set up AWS Bedrock credentials:
+   - The framework uses AWS Bedrock for accessing various LLM models
+   - Set environment variables for AWS credentials:
+     ```bash
+     export AWS_ACCESS_KEY_ID=your_access_key_here
+     export AWS_SECRET_ACCESS_KEY=your_secret_key_here
      ```
-     OPENAI_API_KEY=your_api_key_here
+   - Alternatively, configure AWS credentials using AWS CLI:
+     ```bash
+     aws configure
      ```
+   - Ensure you have access to the required Bedrock models in your AWS account (us-east-1 region by default)
 
 5. If there are any additional data files or models required, place them in the appropriate directories within the project structure.
 
 ### Troubleshooting
 
-- If you encounter issues with the OpenAI API, ensure your API key is correctly set in the `.env` file and that you have sufficient credits.
-- For any import errors, make sure all required packages are installed and that you're running Python from the correct virtual environment.
-- If you face issues with file paths, check that you're running the scripts from the root directory of the project.
+- If you encounter issues with AWS Bedrock API:
+  - Ensure your AWS credentials are correctly set as environment variables
+  - Verify you have access to the Bedrock models in your AWS account
+  - Check that the models are available in the us-east-1 region (default)
+  - Some models may require adding the region prefix (e.g., `us.meta.llama3-1-70b-instruct-v1:0`)
+- For any import errors, make sure all required packages are installed and that you're running Python from the correct virtual environment
+- If you face issues with file paths, check that you're running the scripts from the root directory of the project
 
 ### Note
 
-This project uses environment variables to manage sensitive information like API keys. Never commit your `.env` file or share your API keys publicly.
+This project uses environment variables to manage sensitive information like AWS credentials. Never commit credentials or share your AWS keys publicly.
 
 ## Usage
 
