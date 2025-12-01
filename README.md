@@ -16,15 +16,21 @@ Emotions significantly influence human decision-making. This project explores ho
 ```
 .
 ├── README.md
+├── analyze_division_game.py      # Analysis tool for division game logs
+├── analyze_table_game.py         # Analysis tool for table game logs
 ├── prompts/
 │   └── {language}/
 │       ├── agent/
 │       ├── emotions/
 │       └── games/
-├── run_division_game.py
-├── run_exps_division_game.py
-├── run_table_game.py
+├── run_exps_division_game.py     # Run batch division game experiments
+├── run_table_game.py              # Run table game experiments
 └── src/
+    ├── agent/                     # Agent implementations
+    ├── config_utils/              # Configuration utilities
+    ├── division_game.py           # Division game logic
+    ├── game.py                    # Table game logic
+    └── utils.py                   # Utility functions
 ```
 
 ## Key Features
@@ -121,6 +127,65 @@ To run table games:
 
 ```bash
 python run_table_game.py
+```
+
+## Log Analysis
+
+After running experiments, you can analyze the generated logs using the provided analysis scripts:
+
+### Analyzing Division Games (Dictator/Ultimatum)
+
+The `analyze_division_game.py` script analyzes logs from division game experiments and generates statistical reports:
+
+```bash
+python analyze_division_game.py [log_directory]
+```
+
+**Default log directory**: `EAI-Framework/logs`
+
+**Features**:
+- Analyzes both Proposer and Responder behaviors
+- For Proposers (Dictator/Ultimatum): Calculates average percentage of resources kept
+- For Responders (Ultimatum): Calculates accept rate percentage
+- Generates pivot tables showing behavior patterns by LLM model and emotion
+- Outputs CSV files:
+  - `proposer_analysis.csv`: Proposer statistics grouped by LLM and emotion
+  - `responder_analysis.csv`: Responder statistics grouped by LLM and emotion
+
+**Example Output**:
+```
+=== Proposer Behavior (Avg % Kept) ===
+game                                      dictator  ultimatum
+llm                        emotion                          
+claude-3-5-sonnet          anger             65.2       58.3
+                          happiness         45.8       42.1
+                          no_emotion        50.0       48.5
+```
+
+### Analyzing Table Games (Prisoner's Dilemma)
+
+The `analyze_table_game.py` script analyzes logs from repeated table games:
+
+```bash
+python analyze_table_game.py [log_directory]
+```
+
+**Default log directory**: `logs`
+
+**Features**:
+- Focuses on Prisoner's Dilemma game logs
+- Calculates cooperation rates for each LLM agent
+- Groups results by model and emotional state
+- Generates pivot table showing cooperation patterns
+- Outputs CSV file: `prisoner_dilemma_analysis.csv`
+
+**Example Output**:
+```
+=== Analysis Result ===
+emotion              no_emotion  anger  happiness
+llm                                               
+gpt-oss-120b              45.0   30.2       58.7
+claude-3-7-sonnet         52.3   35.8       62.1
 ```
 
 ## Prompt Structure
