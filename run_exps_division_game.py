@@ -5,31 +5,20 @@ from tqdm import tqdm
 from src.agent.init_agent import init_agent
 from src.config_utils.division_utils import prepare_agent_config, prepare_division_game_config
 from src.dirs import LOG_PATH
-from src.dvision_game import DivisionGame
+from src.division_game import DivisionGame
 from src.utils import (
-    init_openai_client,
     TwoAgentsLogger,
     save_readable_config,
     print_config, read_text,
 )
-from dotenv import load_dotenv
-import os
 import argparse
 import pickle
 
-load_dotenv(".env")
-assert "OPENAI_API_KEY" in os.environ
-
-init_openai_client(os.environ["OPENAI_API_KEY"])
+# The new get_bedrock_client in utils.py will handle credentials.
+# No need to load .env or initialize the client here.
 
 
-def read_cached_configs():
-    with open('cached/cached_configs_1.pkl', 'rb') as f:
-        res1 = pickle.load(f)
-    with open('cached/cached_configs_2.pkl', 'rb') as f:
-        res2 = pickle.load(f)
-    return res1, res2
-
+# Removed caching logic as it's not needed for simplified, fresh runs.
 
 
 def generate_emotions(possible_emotions, possible_prompts):
@@ -40,33 +29,51 @@ def generate_emotions(possible_emotions, possible_prompts):
     return res
 
 
-total_sums = [10**7,  10**3] # [10**2, 10**4, 10**6, 10**8]
-coplayers = ["another person", "colleague", "opponent"]
-llms = ["gpt-4-0125-preview", "gpt-3.5-turbo-0125"] # ["gpt-3.5-turbo-0125"]  # "gpt-4-0125-preview"
-has_emotions = [True, False]
+# --- START MODIFIED PARAMETERS FOR REPRESENTATIVE SAMPLING ---
 
+# 1. 縮減金額情境 (Total Sums)：僅包含 [10**3]
+total_sums = [10**3]
 
-possible_emotions = ["anger", "fear", "disgust", "happiness", "sadness", "surprise"]
-possible_prompts = ["simple", "situation_coplayer", "situation_external"]
+# 2. 鎖定對手角色 (Coplayers)：僅包含 ["opponent"]
+coplayers = ["opponent"]
+
+# 6. 設定 AWS Bedrock 模型 ID (Models)：閉源/強大代表 & 開源/權重代表
+llms = [
+    #"mistral.mistral-7b-instruct-v0:2",      # Mistral 7B (開源/小型)
+    #"mistral.mixtral-8x7b-instruct-v0:1",
+    #"meta.llama3-8b-instruct-v1:0",       # Llama 3 8B (US Profile, 若上面那個失敗通常這個會成功)
+    #"us.meta.llama3-1-70b-instruct-v1:0",
+    #"amazon.titan-text-lite-v1",
+    #"amazon.titan-text-express-v1",          # Amazon Titan (小型/閉源)
+    "openai.gpt-oss-20b-1:0", # 
+    "openai.gpt-oss-120b-1:0", 
+    "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    "anthropic.claude-3-5-sonnet-20240620-v1:0", 
+    "cohere.command-r-v1:0",          # Cohere Command R (不同架構)
+]
+
+has_emotions = [True, False] # 保持不變，因為要對比有無情感的差異
+
+# 3. 精簡情感變數 (Emotions)：僅包含 ["anger", "happiness"]
+# 'no_emotion' 會在 generate_agent_configs 函式中自動處理
+possible_emotions = ["anger", "happiness"]
+
+# 4. 簡化情境提示 (Prompts)：僅包含 ["simple"]
+possible_prompts = ["simple"]
+
 emotions = generate_emotions(possible_emotions, possible_prompts)
-do_scratchpad_steps = [True, False]
-
-predefined_split_ratios = [0.2, 0.3, 0.4] # [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1]
+do_scratchpad_steps = [True, False] # 保持不變，因為這會影響模型行為
 
 
-# game_basic_config = {
-#     "name": "dictator",  # dictator, ultimatum
-#     "total_sum": 1000,
-# }
-#
-# naming_config = {
-#     "currency": "dollars",  # points, dollars, cents,...
-#     "coplayer": "opponent",  # coplayer, opponent, colleague,...
-# }
+# 5. 聚焦關鍵分配比例 (Split Ratios)：[0.2]
+predefined_split_ratios = [0.2] 
+
+# --- END MODIFIED PARAMETERS FOR REPRESENTATIVE SAMPLING ---
+
 
 agent_basic_config = {
     "agent_name": "llm",
-    "llm_name": "gpt-3.5-turbo",
+    "llm_name": "default_llm_agent", # This will be overwritten by llms list
     "has_emotion": False,
     "emotion": "surprise/situation_coplayer",
     "do_scratchpad_step": False,
@@ -122,21 +129,12 @@ def run_game(game_config, naming_config, agent1_config, agent2_config, logger):
     agent1 = init_agent(agent1_config["agent_name"], agent1_config)
     agent2 = init_agent(agent2_config["agent_name"], agent2_config)
 
-    # logger.log_json(
-    #     {
-    #         "agent1_config": agent1_config,
-    #         "agent2_config": agent2_config,
-    #     }
-    # )
-
     logger.log_json(
         {
             "agent1_config": agent1_config,
             "agent2_config": agent2_config,
             "naming_config": naming_config,
             "game_config": game_config,
-            # "agent1_prompt": agent1._history[0],
-            # "agent2_prompt": agent2._history[0],
         }
     )
 
@@ -176,7 +174,7 @@ def run_pipeline(game_basic_config, naming_config, agent1_basic_config, agent2_b
     save_readable_config(agent2_config, logger.run_name, LOG_PATH)
 
 
-# Anger, Disgust, Fear, Happiness, Sadness, Surprise
+
 
 parser = argparse.ArgumentParser(description='Run single experiment')
 parser.add_argument('--verbose', '-v', action='store_true', help="Enable verbose mode")
@@ -184,7 +182,8 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    cached_configs_1, cached_configs_2 = read_cached_configs()
+    # cached_configs_1, cached_configs_2 = read_cached_configs()
+    cached_configs_1, cached_configs_2 = [], []
 
     game_dictator_configs = generate_game_configs("dictator")
     game_ultimatum_configs = generate_game_configs("ultimatum")
@@ -224,8 +223,8 @@ if __name__ == "__main__":
                     emotion_prompt_file_parts[1],
                     cur_agent_basic_config1['do_scratchpad_step']
                 )
-                if cur_config not in cached_configs_1:
-                    run_pipeline(game_basic_config, naming_config, cur_agent_basic_config1, cur_agent_basic_config2)
+                # if cur_config not in cached_configs_1:
+                run_pipeline(game_basic_config, naming_config, cur_agent_basic_config1, cur_agent_basic_config2)
                 # run_pipeline(game_basic_config, naming_config, cur_agent_basic_config1, cur_agent_basic_config2)
 
     # ----ultimatum----
@@ -259,8 +258,8 @@ if __name__ == "__main__":
                         predefined_agent_config['ratio']
                     )
                     all_configs_2.append(cur_config)
-                    if cur_config not in cached_configs_2:
-                        run_pipeline(game_basic_config, naming_config, predefined_agent_config, cur_agent_basic_config2)
+                    # if cur_config not in cached_configs_2:
+                    run_pipeline(game_basic_config, naming_config, predefined_agent_config, cur_agent_basic_config2)
     #
     # with open('testing/possible_configs_1.pkl', 'wb') as f:
     #     pickle.dump(all_configs_1, f)
