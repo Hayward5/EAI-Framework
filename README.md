@@ -19,7 +19,7 @@ Emotions significantly influence human decision-making. This project explores ho
 │       ├── emotions/
 │       └── games/
 ├── run_exps_division_game.py     # Run batch division game experiments
-├── run_table_game.py              # Run table game experiments
+├── run_table_game.py             # Run table game experiments
 └── src/
     ├── agent/                     # Agent implementations
     ├── config_utils/              # Configuration utilities
