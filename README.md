@@ -201,7 +201,8 @@ The `prompts` directory contains language-specific prompts organized as follows:
 - `agent/`: Contains prompts for agent behavior, memory updates, etc.
   - `memory_update.txt`: Prompt for updating agent's memory after current round (not for bargaining)
   - `emotions/`: Folder with prompts for questioning emotions and inserting them into memory
-  - `game_settings/`: Folder with prompts for defining environment, conditions, and general prompt for initialization memory of agent - `outer_emotions/`: Folder with prompts for questioning what emotions to demonstrate and how to describe them to coplayer (not for bargaining)
+  - `game_settings/`: Folder with prompts for defining environment, conditions, and general prompt for initialization memory of agent
+  - `outer_emotions/`: Folder with prompts for questioning what emotions to demonstrate and how to describe them to coplayer (not for bargaining)
 - `emotions/`: Descriptions for initial agents' emotions
 - `games/`: Game-specific prompts and rules
   - `rewards.json`: Reward matrix
