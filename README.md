@@ -1,5 +1,5 @@
 # EAI: Emotional Decision-Making in LLMs for Strategic Games and Ethical Dilemmas
-### Fork From https://github.com/AIRI-Institute/EAI-Framework
+### Forked From https://github.com/AIRI-Institute/EAI-Framework
 This repository hosts the EAI framework for studying how large language models (LLMs) behave in strategic games when guided by explicit emotional instructions. The current codebase focuses on running reproducible experiments for repeated table games (e.g., Prisoner's Dilemma) and division games (Dictator and Ultimatum), logging decisions, and analyzing outcomes.
 
 ## Overview
