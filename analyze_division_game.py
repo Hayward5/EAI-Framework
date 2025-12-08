@@ -1,23 +1,25 @@
-import pandas as pd
+import re  # 添加此行以使用正則表達式
+import csv  # 添加此行以使用 csv.reader
+from typing import Tuple, Optional, Dict, Any
 import os
 import json
+import pandas as pd
 import argparse
-import re
-from typing import Tuple, Optional, Dict, Any
 
 def parse_split_decision(decision_str: str) -> Tuple[Optional[float], Optional[float]]:
     """
     Parses 'number1;number2' for Dictator/Ultimatum Proposer.
     """
     try:
-        # Filter strictly to keep digits and split char
-        cleaned_str = ''.join(filter(lambda c: c.isdigit() or c in ';.', str(decision_str)))
-        parts = cleaned_str.split(';')
-        if len(parts) == 2:
-            return float(parts[0]), float(parts[1])
+        # 使用正則表達式提取第一個 'num;num' 模式，避免重複字串干擾
+        match = re.search(r'(\d+);(\d+)', str(decision_str))
+        if match:
+            num1 = float(match.group(1))
+            num2 = float(match.group(2))
+            return num1, num2
+        return None
     except (ValueError, AttributeError, TypeError):
-        pass
-    return None, None
+        return None
 
 def parse_responder_decision(decision_str: str) -> Optional[int]:
     """
@@ -77,10 +79,21 @@ def analyze_log_directory(log_dir_path: str) -> Optional[Dict[str, Any]]:
         game_name = game_cfg.get('name', 'unknown')
 
         # --- Load Data ---
-        # CSV structure: Timestamp, Agent1_Decision, Agent2_Decision
-        df = pd.read_csv(decisions_file, header=None)
-        # Select only the decision columns (drop timestamp at col 0)
-        df_decisions = df.iloc[:, 1:3] 
+        # 使用 csv.reader 手動解析 CSV，以正確處理帶引號的多行字串
+        with open(decisions_file, 'r') as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+        
+        if not rows:
+            return None
+        
+        # Assume first row is the decision row: timestamp, agent1_decision, agent2_decision
+        row = rows[0]
+        if len(row) < 3:
+            return None
+        
+        agent1_decision = row[1]
+        agent2_decision = row[2]
         
         total_sum = float(game_cfg.get('total_sum', 1.0))
         result_metrics = {
@@ -88,7 +101,7 @@ def analyze_log_directory(log_dir_path: str) -> Optional[Dict[str, Any]]:
             "game": game_name,
             "role": "Unknown",
             "emotion": emotion,
-            "num_samples": 0,
+            "num_samples": 1,  # Assuming one sample per log
             "metric_value": 0.0,
             "metric_type": "N/A"
         }
@@ -101,12 +114,11 @@ def analyze_log_directory(log_dir_path: str) -> Optional[Dict[str, Any]]:
             result_metrics["metric_type"] = "Accept Rate (%)"
             
             # Parse as Boolean (1/0)
-            decisions = df_decisions.iloc[:, llm_decision_col].apply(parse_responder_decision)
-            valid_decisions = decisions.dropna()
-            
-            if not valid_decisions.empty:
-                result_metrics["num_samples"] = len(valid_decisions)
-                result_metrics["metric_value"] = round(valid_decisions.mean() * 100, 2)
+            decision_parsed = parse_responder_decision(agent2_decision)
+            if decision_parsed is not None:
+                result_metrics["metric_value"] = round(decision_parsed * 100, 2)
+            else:
+                return None
         
         # Case 2: Proposer / Dictator (Splitter)
         else:
@@ -114,20 +126,13 @@ def analyze_log_directory(log_dir_path: str) -> Optional[Dict[str, Any]]:
             result_metrics["metric_type"] = "Kept Share (%)"
             
             # Parse as Split (Keep;Give)
-            decisions = df_decisions.iloc[:, llm_decision_col].apply(parse_split_decision)
-            
-            # Extract 'kept' part (index 0 of tuple)
-            kept_values = decisions.apply(lambda x: x[0] if x else None)
-            valid_decisions = kept_values.dropna()
-            
-            if not valid_decisions.empty:
-                result_metrics["num_samples"] = len(valid_decisions)
-                # Calculate percentage kept
-                avg_kept = valid_decisions.mean()
-                result_metrics["metric_value"] = round((avg_kept / total_sum) * 100, 2)
-
-        if result_metrics["num_samples"] == 0:
-            return None
+            decision_to_parse = agent1_decision if llm_decision_col == 0 else agent2_decision
+            split_parsed = parse_split_decision(decision_to_parse)
+            if split_parsed and split_parsed[0] is not None:
+                kept = split_parsed[0]
+                result_metrics["metric_value"] = round((kept / total_sum) * 100, 2)
+            else:
+                return None
             
         return result_metrics
 
@@ -141,44 +146,46 @@ def main():
     args = parser.parse_args()
 
     if not os.path.isdir(args.log_root):
-        print("Log directory not found.")
+        print(f"Error: {args.log_root} is not a directory.")
         return
 
     all_results = []
+    llm_order = []  # 記錄 LLM 出現順序
     for dir_name in sorted(os.listdir(args.log_root)):
-        full_dir_path = os.path.join(args.log_root, dir_name)
-        if os.path.isdir(full_dir_path):
-            res = analyze_log_directory(full_dir_path)
-            if res: all_results.append(res)
+        log_dir_path = os.path.join(args.log_root, dir_name)
+        if os.path.isdir(log_dir_path):
+            result = analyze_log_directory(log_dir_path)
+            if result:
+                all_results.append(result)
+                # 記錄 LLM 順序（避免重複）
+                if result['llm'] not in llm_order:
+                    llm_order.append(result['llm'])
 
     if not all_results:
-        print("No results found.")
+        print("No valid results found.")
         return
 
     df = pd.DataFrame(all_results)
     
     # Output 1: Proposer Stats
-    print("\n=== Proposer Behavior (Avg % Kept) ===")
     proposer_df = df[df['role'] == 'Proposer']
     if not proposer_df.empty:
-        piv = proposer_df.pivot_table(
-            index=['llm', 'emotion'], columns='game', values='metric_value', aggfunc='mean'
-        )
-        print(piv.fillna("-"))
-        # Save to CSV in the parent directory
-        piv.to_csv('../proposer_analysis.csv')
-    
+        proposer_pivot = proposer_df.pivot_table(values='metric_value', index=['game', 'llm'], columns='emotion', aggfunc='mean')
+        # 按 LLM 處理順序排序
+        proposer_pivot = proposer_pivot.reindex(llm_order, level='llm')
+        print("=== Proposer Behavior (Avg % Kept) ===")
+        print(proposer_pivot)
+        proposer_pivot.to_csv('../proposer_analysis.csv')
+
     # Output 2: Responder Stats
-    print("\n=== Responder Behavior (Accept Rate %) ===")
     responder_df = df[df['role'] == 'Responder']
     if not responder_df.empty:
-        # Game is always ultimatum for responder here
-        piv = responder_df.pivot_table(
-            index=['llm'], columns='emotion', values='metric_value', aggfunc='mean'
-        )
-        print(piv.fillna("-"))
-        # Save to CSV in the parent directory
-        piv.to_csv('../responder_analysis.csv')
+        responder_pivot = responder_df.pivot_table(values='metric_value', index=['llm'], columns='emotion', aggfunc='mean')
+        # 按 LLM 處理順序排序
+        responder_pivot = responder_pivot.reindex(llm_order)
+        print("=== Responder Behavior (Accept Rate %) ===")
+        print(responder_pivot)
+        responder_pivot.to_csv('../responder_analysis.csv')
 
 if __name__ == "__main__":
     main()
