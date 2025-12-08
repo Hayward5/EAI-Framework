@@ -13,6 +13,7 @@ from src.utils import (
 )
 import argparse
 import pickle
+import time  # 添加此行以使用 time.sleep
 
 # The new get_bedrock_client in utils.py will handle credentials.
 # No need to load .env or initialize the client here.
@@ -39,17 +40,17 @@ coplayers = ["opponent"]
 
 # 6. 設定 AWS Bedrock 模型 ID (Models)：閉源/強大代表 & 開源/權重代表
 llms = [
-    #"mistral.mistral-7b-instruct-v0:2",      # Mistral 7B (開源/小型)
+    "mistral.mistral-7b-instruct-v0:2",      # Mistral 7B (開源/小型)
     #"mistral.mixtral-8x7b-instruct-v0:1",
     #"meta.llama3-8b-instruct-v1:0",       # Llama 3 8B (US Profile, 若上面那個失敗通常這個會成功)
     #"us.meta.llama3-1-70b-instruct-v1:0",
     #"amazon.titan-text-lite-v1",
     #"amazon.titan-text-express-v1",          # Amazon Titan (小型/閉源)
     "openai.gpt-oss-20b-1:0", # 
-    "openai.gpt-oss-120b-1:0", 
-    "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-    "anthropic.claude-3-5-sonnet-20240620-v1:0", 
-    "cohere.command-r-v1:0",          # Cohere Command R (不同架構)
+    #"openai.gpt-oss-120b-1:0", 
+    #"us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    #"anthropic.claude-3-5-sonnet-20240620-v1:0", 
+    #"cohere.command-r-v1:0",          # Cohere Command R (不同架構)
 ]
 
 has_emotions = [True, False] # 保持不變，因為要對比有無情感的差異
@@ -173,6 +174,8 @@ def run_pipeline(game_basic_config, naming_config, agent1_basic_config, agent2_b
     save_readable_config(agent1_config, logger.run_name, LOG_PATH)
     save_readable_config(agent2_config, logger.run_name, LOG_PATH)
 
+    time.sleep(1)  # 添加此行：在每個 run_pipeline 後休息 1 秒，以避免 AWS Bedrock API 速率限制
+
 
 
 
@@ -199,7 +202,8 @@ if __name__ == "__main__":
 
     all_configs_1 = []
 
-    for game_basic_config in tqdm(game_dictator_configs + game_ultimatum_configs, desc='Iterating GAME conf'):
+    # 修改：移除 game_ultimatum_configs，只保留 game_dictator_configs（即 dictator proposer）
+    for game_basic_config in tqdm(game_dictator_configs, desc='Iterating GAME conf'):
         game_basic_config["do_second_step"] = False
         for naming_config in tqdm(name_configs, desc='Iterating NAME conf'):
             for cur_agent_basic_config in tqdm(agent_configs, desc='Iterating AGENT conf'):
@@ -229,11 +233,11 @@ if __name__ == "__main__":
 
     # ----ultimatum----
 
-
     print('ULTIMATUM 2')
     all_configs_2 = []
 
     # --2--
+    # 保留：這部分是 ultimatum responder（第二階段，do_second_step = True）
     for game_basic_config in tqdm(game_ultimatum_configs, desc='Iterating GAME conf'):
         game_basic_config["do_second_step"] = True
         for naming_config in tqdm(name_configs, desc='Iterating NAME conf'):
@@ -264,5 +268,5 @@ if __name__ == "__main__":
     # with open('testing/possible_configs_1.pkl', 'wb') as f:
     #     pickle.dump(all_configs_1, f)
 
-    with open('testing/possible_configs_22.pkl', 'wb') as f:
-        pickle.dump(all_configs_2, f)
+    # with open('testing/possible_configs_22.pkl', 'wb') as f:
+    #     pickle.dump(all_configs_2, f)
