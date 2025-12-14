@@ -38,6 +38,14 @@ def parse_responder_decision(decision_str: str) -> Optional[int]:
         return 0
     return None
 
+def _strip_think_blocks(s: str) -> str:
+    """
+    Remove any <think>...</think> blocks (including multi-line) from a string.
+    """
+    if not isinstance(s, str):
+        return s
+    return re.sub(r'<think>.*?</think>', '', s, flags=re.IGNORECASE | re.DOTALL)
+
 def analyze_log_directory(log_dir_path: str) -> Optional[Dict[str, Any]]:
     # --- File Paths ---
     decisions_file = os.path.join(log_dir_path, 'div_decisions.csv')
@@ -87,13 +95,15 @@ def analyze_log_directory(log_dir_path: str) -> Optional[Dict[str, Any]]:
         if not rows:
             return None
         
+        # Strip <think>...</think> blocks from all fields in the first row
+        cleaned_row = [_strip_think_blocks(field) if field is not None else "" for field in rows[0]]
+        
         # Assume first row is the decision row: timestamp, agent1_decision, agent2_decision
-        row = rows[0]
-        if len(row) < 3:
+        if len(cleaned_row) < 3:
             return None
         
-        agent1_decision = row[1]
-        agent2_decision = row[2]
+        agent1_decision = cleaned_row[1]
+        agent2_decision = cleaned_row[2]
         
         total_sum = float(game_cfg.get('total_sum', 1.0))
         result_metrics = {
@@ -175,7 +185,7 @@ def main():
         proposer_pivot = proposer_pivot.reindex(llm_order, level='llm')
         print("=== Proposer Behavior (Avg % Kept) ===")
         print(proposer_pivot)
-        proposer_pivot.to_csv('../proposer_analysis.csv')
+        proposer_pivot.to_csv('proposer_analysis.csv')
 
     # Output 2: Responder Stats
     responder_df = df[df['role'] == 'Responder']
@@ -185,7 +195,7 @@ def main():
         responder_pivot = responder_pivot.reindex(llm_order)
         print("=== Responder Behavior (Accept Rate %) ===")
         print(responder_pivot)
-        responder_pivot.to_csv('../responder_analysis.csv')
+        responder_pivot.to_csv('responder_analysis.csv')
 
 if __name__ == "__main__":
     main()
